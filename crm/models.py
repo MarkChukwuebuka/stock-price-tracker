@@ -1,5 +1,14 @@
 from django.db import models
+from django.db.models import TextChoices
 from django.utils import timezone
+
+
+class ActivityType(TextChoices):
+    delete = "delete"
+    update = "update"
+    create = "create"
+    hard_delete = "hard_delete"
+
 
 
 class AvailableManager(models.Manager):
@@ -8,15 +17,6 @@ class AvailableManager(models.Manager):
             super(AvailableManager, self)
             .get_queryset()
             .filter(deleted_at__isnull=True)
-        )
-
-
-class ActiveManager(models.Manager):
-    def get_queryset(self):
-        return (
-            super(ActiveManager, self)
-            .get_queryset()
-            .filter(deactivated_at__isnull=True)
         )
 
 

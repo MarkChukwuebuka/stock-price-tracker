@@ -2,7 +2,6 @@ import decimal
 import json
 import random
 import re
-import string
 from datetime import datetime, date
 from functools import wraps
 from math import ceil
@@ -25,10 +24,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from account.models import UserTypes, User
-from crm.models import Organization, Staff
-from idss.decorators import CustomApiPermissionRequired
-from idss.errors.app_errors import OperationError
+from account.models import User, UserTypes
+
+from spt.errors.app_errors import OperationError
 from services.cache_util import CacheUtil
 from services.encryption_util import AESCipher
 from services.log import AppLogger
@@ -141,24 +139,6 @@ class Util:
         return re.match(r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@#$%^&+=!]).{8,}$", password)
 
     @staticmethod
-    def get_user_with_roles(user):
-        def _user_data_source_callback():
-            _data = {
-                "id": user.id,
-                "permissions": list(user.user_permissions_id()),
-                "roles": list(user.roles.values_list('id', flat=True))
-            }
-            return _data, None
-
-        if user:
-            util = CacheUtil()
-            cache_key = util.generate_cache_key(user.pk, user.tenant_id, "roles", "permissions")
-            data, _ = util.get_cache_value_or_default(cache_key, _user_data_source_callback)
-            return data
-        else:
-            return {"id": None, "permissions": [], "roles": []}
-
-    @staticmethod
     def generate_digits(length):
         digits = '0123456789'
         code = ""
@@ -212,52 +192,12 @@ class CustomAPIRequestUtil(DefaultPagination, CacheUtil):
         return user
 
     @property
-    def is_platform_admin(self) -> bool:
+    def is_super_admin(self) -> bool:
         if not self.auth_user:
             return False
 
-        return self.auth_user.user_type == UserTypes.idss_user
+        return self.auth_user.user_type == UserTypes.super_admin
 
-    @property
-    def is_staff(self) -> bool:
-        if not self.auth_user:
-            return False
-
-        return self.auth_user.user_type == UserTypes.organization_staff
-
-    @property
-    def is_organization_admin(self) -> bool:
-        if not self.auth_user:
-            return False
-
-        return self.auth_user.user_type == UserTypes.organization_admin
-
-    @property
-    def auth_organization(self) -> Organization | None:
-        if not self.auth_user:
-            return None
-
-        def _get_rec():
-            return self.auth_user.organization, None
-
-        organization, _ = self.get_cache_value_or_default(
-            self.generate_cache_key("organization", "user", self.auth_user.id), _get_rec
-        )
-
-        return organization
-
-    @property
-    def auth_staff(self) -> Staff | None:
-        if not self.auth_user:
-            return None
-
-        def _get_rec():
-            return self.auth_user.staff_record, None
-
-        staff, _ = self.get_cache_value_or_default(
-            self.generate_cache_key("organization", "staff", self.auth_user.id), _get_rec)
-
-        return staff
 
     def report_activity(self, activity_type, data, description=None):
         if not description:
@@ -406,7 +346,7 @@ class CustomAPIRequestUtil(DefaultPagination, CacheUtil):
         return self.get_paginated_list_response(data, queryset.count())
 
 
-class CustomApiRequestProcessorBase(CustomApiPermissionRequired, CustomAPIRequestUtil, CustomAPIResponseUtil):
+class CustomApiRequestProcessorBase(CustomAPIRequestUtil, CustomAPIResponseUtil):
     permission_classes = [IsAuthenticated]
 
     payload = None
@@ -435,7 +375,6 @@ class CustomApiRequestProcessorBase(CustomApiPermissionRequired, CustomAPIReques
         return self.request.user if self.request.user else None
 
     def process_request(self, request, target_function, **extra_args):
-        self.check_required_roles_and_permissions()
 
         if self.request_payload_requires_decryption:
             encryption_util = AESCipher(settings.APP_ENC_KEY, settings.APP_ENC_VEC)
@@ -531,19 +470,6 @@ class CustomApiRequestProcessorBase(CustomApiPermissionRequired, CustomAPIReques
             response_data = encryption_util.encrypt_nested(response_data)
 
         return self.response_with_json(response_data)
-
-
-def generate_password():
-    letters = ''.join((random.choice(string.ascii_letters) for _ in range(random.randint(10, 15))))
-    digits = ''.join((random.choice(string.digits) for _ in range(random.randint(3, 5))))
-
-    sample_list = list(letters + digits)
-    random.shuffle(sample_list)
-    return ''.join(sample_list)
-
-
-def generate_username():
-    return ''.join((random.choice(string.ascii_lowercase) for _ in range(random.randint(10, 15))))
 
 
 def generate_ref():

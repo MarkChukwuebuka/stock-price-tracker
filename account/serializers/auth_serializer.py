@@ -11,33 +11,21 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from account.models import User
 from account.services.user_service import UserService
 from services.log import AppLogger
-from services.util import render_template_to_text, format_phone_number
+from services.util import render_template_to_text
 
-
-class UserPasswordResetSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(max_length=250, min_length=12)
-    new_password = serializers.CharField(max_length=250, min_length=12)
-
-    def validate_username(self, username):
-        return username
-
-    def validate_new_password(self, password):
-        return password
 
 
 class LoginSerializer(TokenObtainSerializer):
-    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True)
-    grant_type = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     token_class = RefreshToken
 
     def validate(self, attrs):
-        username = attrs.get("username").lower()
+        email = attrs.get("email").lower()
         password = attrs.get("password")
 
         authenticate_kwargs = {
-            "username": username,
+            "email": email,
             "password": password
         }
         try:
@@ -102,7 +90,7 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError("User account already exist, please proceed to login", "email")
 
         data["email"] = email
-        data["password"] = make_password(password)
+        data["password"] = password
 
         return data
 

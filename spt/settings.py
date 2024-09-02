@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_spectacular',
 
     'account',
     'crm',
@@ -64,7 +65,7 @@ ROOT_URLCONF = 'spt.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -191,6 +192,25 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
     "SIGNING_KEY": os.getenv("JWT_SECRET", "secret-is-not-yet-strengthened"),
     "AUTH_HEADER_TYPES": (BEARER_KEY,),
-    "USER_ID_FIELD": "username",
+    "USER_ID_FIELD": "email",
     'TOKEN_BLACKLIST': 'rest_framework_simplejwt.token_blacklist',
+}
+
+
+APP_ENC_KEY = os.getenv("APP_ENC_KEY")
+APP_ENC_VEC = os.getenv("APP_ENC_VEC")
+
+APP_ENC_ENABLED = False
+
+
+BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": BROKER_URL,
+        "KEY_PREFIX": os.getenv("REDIS_PREFIX", "spt"),
+        "TIMEOUT": 60 * 15,  # in seconds: 60 * 15 (15 minutes),
+    }
 }
